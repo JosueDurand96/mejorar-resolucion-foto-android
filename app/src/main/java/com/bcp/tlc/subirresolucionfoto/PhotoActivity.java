@@ -526,7 +526,6 @@ public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.
         try {
             /*Photo 1*/
             if (resultCode == RESULT_OK && requestCode == REQUEST_CODE) {
-                Log.println(1, "file", mCurrentPhotoPath);
                 Bitmap mImageBitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse(mCurrentPhotoPath));
                 imagePhoto.setImageBitmap(mImageBitmap);
             }
