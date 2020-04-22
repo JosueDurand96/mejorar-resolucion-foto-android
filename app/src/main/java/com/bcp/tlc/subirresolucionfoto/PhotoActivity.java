@@ -18,8 +18,11 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.StrictMode;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
@@ -36,7 +39,11 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener, LocationListener {
@@ -85,6 +92,7 @@ public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.
 
 
     String varRegionDepartamento, varProvincia, varDistrito, varANP = "";
+    String mCurrentPhotoPath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -248,6 +256,12 @@ public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(PhotoActivity.this, new String[]{Manifest.permission.CAMERA}, 1);
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(PhotoActivity.this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
             }
         }
 
@@ -434,10 +448,42 @@ public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.
         }
     }
 
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  // prefix
+                ".jpg",         // suffix
+                storageDir      // directory
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        mCurrentPhotoPath = "file:" + image.getAbsolutePath();
+        return image;
+    }
+
     private void openCamera() {
-        Intent takePicture = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (takePicture.resolveActivity(getPackageManager()) != null) {
-            startActivityForResult(takePicture, REQUEST_CODE);
+        StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+        StrictMode.setVmPolicy(builder.build());
+
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+                Log.i("IOException", String.valueOf(ex));
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(photoFile));
+                startActivityForResult(cameraIntent, REQUEST_CODE);
+            }
         }
     }
 
@@ -477,26 +523,30 @@ public class PhotoActivity extends AppCompatActivity implements GoogleApiClient.
     @SuppressLint("MissingSuperCall")
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        /*Photo 1*/
-        if (resultCode == RESULT_OK && requestCode == REQUEST_CODE && data != null) {
-            Bitmap
-                    imageBitmap = (Bitmap) data.getExtras().get("data");
-            imagePhoto.setImageBitmap(imageBitmap);
-        }
-        /*Photo 2*/
-        if (resultCode == RESULT_OK && requestCode == REQUEST_CODE2 && data != null) {
-            Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
-            imagePhoto2.setImageBitmap(imageBitmap);
-        }
-        /*Photo 3*/
-        if (resultCode == RESULT_OK && requestCode == REQUEST_CODE3 && data != null) {
-            Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
-            imagePhoto3.setImageBitmap(imageBitmap);
-        }
-        /*Photo 4*/
-        if (resultCode == RESULT_OK && requestCode == REQUEST_CODE4 && data != null) {
-            Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
-            imagePhoto4.setImageBitmap(imageBitmap);
+        try {
+            /*Photo 1*/
+            if (resultCode == RESULT_OK && requestCode == REQUEST_CODE) {
+                Log.println(1, "file", mCurrentPhotoPath);
+                Bitmap mImageBitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse(mCurrentPhotoPath));
+                imagePhoto.setImageBitmap(mImageBitmap);
+            }
+            /*Photo 2*/
+            if (resultCode == RESULT_OK && requestCode == REQUEST_CODE2) {
+                Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
+                imagePhoto2.setImageBitmap(imageBitmap);
+            }
+            /*Photo 3*/
+            if (resultCode == RESULT_OK && requestCode == REQUEST_CODE3) {
+                Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
+                imagePhoto3.setImageBitmap(imageBitmap);
+            }
+            /*Photo 4*/
+            if (resultCode == RESULT_OK && requestCode == REQUEST_CODE4) {
+                Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
+                imagePhoto4.setImageBitmap(imageBitmap);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
